@@ -1,3 +1,20 @@
+/*
+ _                  _ 
+| |    ___  _ __ __| |
+| |   / _ \| '__/ _` |
+| |__| (_) | | | (_| |
+|_____\___/|_|  \__,_|
+ * 
+ * Project     : Reciver_Router
+ * Author      : lord_rajkumar
+ * GitHub      : https://github.com/rajpatel8/Snap-Sync-v2.0
+ * Description : Basic TCP server written in C
+ * License     : MIT License
+ * 
+ * (c) 2025 lord rajkumar. All rights reserved.
+ */
+
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
