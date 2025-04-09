@@ -1,9 +1,9 @@
 /*
- _                  _ 
-| |    ___  _ __ __| |
-| |   / _ \| '__/ _` |
-| |__| (_) | | | (_| |
-|_____\___/|_|  \__,_|
+ *  _                  _ 
+ * | |    ___  _ __ __| |
+ * | |   / _ \| '__/ _` |
+ * | |__| (_) | | | (_| |
+ * |_____\___/|_|  \__,_|
  * 
  * Project     : Reciver_Router
  * Author      : lord_rajkumar
@@ -14,7 +14,6 @@
  * (c) 2025 lord rajkumar. All rights reserved.
  */
 
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -22,10 +21,24 @@
 #include <sys/types.h> 
 #include <sys/socket.h>
 #include <netinet/in.h>
+#include <sys/stat.h>
+
+void prcclient (int sock) ;
+
+void setup() ;
+
+void error(const char *msg)
+{
+    perror(msg);
+    exit(1);
+}
+
 int main(int argc, char *argv[]){
 
-    struct sockaddr_in server_addr, client_addr;
+    struct sockaddr_in server_addr, client_addr ;
     socklen_t client ;
+    int new_sock_fd,  pid ;
+
     int socket_fd = socket(AF_INET ,SOCK_STREAM , 0) ;
 
     if (socket_fd<0)
@@ -33,12 +46,10 @@ int main(int argc, char *argv[]){
         printf("Failed to create Socket") ;
     }
 
-    // If compiler might optimize this bzero
     bzero((char *) &server_addr, sizeof(server_addr));
 
-    // so using explicite_bzero
     // explicite_bzero((char *) &server_addr, sizeof(server_addr));
-
+ 
     int port = atoi(argv[1]) ;
 
     server_addr.sin_family = AF_INET ;
@@ -53,14 +64,46 @@ int main(int argc, char *argv[]){
 
     client = sizeof(client_addr);
 
-    int new_sock_fd = accept(socket_fd, (struct sockaddr *) &client_addr, &client) ;
+    while (1) {
+        new_sock_fd = accept(socket_fd, 
+              (struct sockaddr *) &client_addr, &client);
+        if (new_sock_fd < 0) 
+            error("ERROR on accept");
+        pid = fork();
+        if (pid < 0)
+            error("ERROR on fork");
+        if (pid == 0)  {
+            close(socket_fd);
+            prcclient(new_sock_fd);
+            exit(0);
+        }
+        else close(new_sock_fd);
+    } /* end of while */
+    close(socket_fd);
+    return 0;
 
-    if(new_sock_fd<0){
-        printf("Fail to Accept") ;
+}
+
+void setup_S1(char * path){
+    struct stat st = {0};
+    char temp[256] = "~";
+    strcat(temp, path); // assuming user enters path with '/'
+    strcpy(path, temp);
+    if (stat(path, &st) == -1) {
+        mkdir(path, 0700);
     }
+}
 
-    char buffer[256] ;
+void prcclient (int sock)
+{
+   // TODO : ROUTER LOGIC
+   // FIRST : Client will share firl type.
+   // Will read it and direct the traffic to designated server
 
-    bzero(buffer,256) ;
+   int n ;
+   char buffer[3] ;
+   n = read(sock , buffer ,3) ;
+
+   
 
 }
