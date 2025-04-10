@@ -15,6 +15,8 @@
 char server_hostname[256];
 char server_ip[256];
 
+int upload_file(const char *filename, const char *dest);
+
 bool is_valid_file(const char *filename) ;
 
 int sanitize_input(char * buffer); 
@@ -123,7 +125,16 @@ int main(int argc, char *argv[])
         switch (mode_bit)
         {
             case 1 :
-                upload_file(strtok(buffer," "),strtok(NULL," "));
+            {
+                // Skip the command name (uploadf) and get the actual filename and destination
+                char *command = strtok(buffer, " ");
+                char *filename = strtok(NULL, " ");
+                char *destination = strtok(NULL, " ");
+                if (filename && destination) {
+                    upload_file(filename, destination);
+                }
+                break;
+            }
         }
 
     /*
@@ -226,4 +237,35 @@ void error(const char *msg)
     exit(0);
 }
 
-
+int upload_file(const char *filename, const char *dest) {
+    char command[1024];
+    int status;
+    
+    // Trim any newline characters from destination
+    char clean_dest[256];
+    strncpy(clean_dest, dest, sizeof(clean_dest) - 1);
+    clean_dest[sizeof(clean_dest) - 1] = '\0';
+    char *newline = strchr(clean_dest, '\n');
+    if (newline) {
+        *newline = '\0';
+    }
+    
+    // Create the rsync command
+    snprintf(command, sizeof(command), 
+             "rsync -avz %s %s:%s", 
+             filename, server_ip, clean_dest);
+    
+    printf("Executing: %s\n", command);
+    
+    // Execute the command
+    status = system(command);
+    
+    if (status == 0) {
+        printf("File '%s' successfully uploaded to %s (%s):%s\n", 
+               filename, server_hostname, server_ip, clean_dest);
+        return 0;
+    } else {
+        fprintf(stderr, "Failed to upload file '%s' to server\n", filename);
+        return -1;
+    }
+}
