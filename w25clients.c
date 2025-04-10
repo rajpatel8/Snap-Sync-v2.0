@@ -11,11 +11,39 @@
 #define true 1
 #define false 0
 
+// Global variables to store server information
+char server_hostname[256];
+char server_ip[256];
+
 bool is_valid_file(const char *filename) ;
 
 int sanitize_input(char * buffer); 
 
 void error(const char *msg);
+
+// Parse server hostname and IP address from welcome message
+void parse_server_info(const char *buffer, char *hostname, char *ip_address) {
+    char *hostname_ptr = strstr(buffer, "Hostname: ");
+    char *ip_ptr = strstr(buffer, "IP Address: ");
+    
+    if (hostname_ptr && ip_ptr) {
+        hostname_ptr += 10; // Skip "Hostname: "
+        char *end = strchr(hostname_ptr, '\n');
+        if (end) {
+            size_t len = end - hostname_ptr;
+            strncpy(hostname, hostname_ptr, len);
+            hostname[len] = '\0';
+        }
+        
+        ip_ptr += 12; // Skip "IP Address: "
+        end = strchr(ip_ptr, '\n');
+        if (end) {
+            size_t len = end - ip_ptr;
+            strncpy(ip_address, ip_ptr, len);
+            ip_address[len] = '\0';
+        }
+    }
+}
 
 int main(int argc, char *argv[])
 {
@@ -23,7 +51,7 @@ int main(int argc, char *argv[])
     int sockfd, portno, n;
     struct sockaddr_in serv_addr;
     struct hostent *server;
-
+    
     char buffer[256];
     if (argc < 3) {
        fprintf(stderr,"usage %s hostname port\n", argv[0]);
@@ -55,6 +83,23 @@ int main(int argc, char *argv[])
     if (connect(sockfd,(struct sockaddr *) &serv_addr,sizeof(serv_addr)) < 0) 
         error("ERROR connecting");
 
+    // Receive initial welcome message with server information
+    bzero(buffer, 256);
+    n = read(sockfd, buffer, 255);
+    if (n < 0) 
+        error("ERROR reading from socket");
+    
+    // Display welcome message
+    printf("%s\n", buffer);
+    
+    // Parse and store server hostname and IP
+    parse_server_info(buffer, server_hostname, server_ip);
+    
+    // Print confirmation that we've connected to the server
+    if (strlen(server_hostname) > 0 && strlen(server_ip) > 0) {
+        printf("Connected to server: %s (%s)\n", server_hostname, server_ip);
+    }
+
     while (1)
     {
         printf("Please enter Command : \n");
@@ -62,7 +107,24 @@ int main(int argc, char *argv[])
         bzero(buffer,256);
         fgets(buffer,256,stdin);
 
-        sanitize_input(buffer) ;
+        // copy the buffer to a new string
+        char * buffer_copy = malloc(strlen(buffer) + 1);
+        if (buffer_copy == NULL) {
+            fprintf(stderr, "Memory allocation failed\n");
+            exit(1);
+        }
+        strcpy(buffer_copy, buffer);
+
+        int mode_bit = sanitize_input(buffer_copy) ;
+
+        // print buffer
+        printf("Command : %s\n", buffer);
+
+        switch (mode_bit)
+        {
+            case 1 :
+                upload_file(strtok(buffer," "),strtok(NULL," "));
+        }
 
     /*
     TODO : uploadf filename deatination_path
@@ -108,16 +170,45 @@ int sanitize_input(char * buffer){
             }
             if (is_valid_file(pch)) {
                 printf("File %s exists\n", pch);
-                // get the destination path
-                char * dest = strtok (NULL, " ");
-                // upload_file(pch, dest);
+                // check if the file is a valid .c , .pdf , .txt or .zip file
+                char *ext = strrchr(pch, '.');
+                if (ext == NULL) {
+                    printf("File %s does not have a valid extension\n", pch);
+                    // reset the bit
+                    return 0;
+                }
+                if (strcasecmp(ext, ".c") != 0 && strcasecmp(ext, ".pdf") != 0 && strcasecmp(ext, ".txt") != 0 && strcasecmp(ext, ".zip") != 0) {
+                    printf("File %s does not have a valid extension\n", pch);
+                    // reset the bit
+                    return 0;
+                }
+                return mode_bit ;
             } else {
                 printf("File %s does not exist\n", pch);
+                // reset the bit
+                return 0;
             }
             break;
+        case 2:
+            // downlf command code will go here
+            break;
             
+        case 3:
+            // removef command code will go here
+            break;
             
+        case 4:
+            // dispfname command code will go here
+            break;
+            
+        case 5:
+            // exit command
+            printf("Disconnecting from server: %s (%s)\n", server_hostname, server_ip);
+            exit(0);
+            break;
     }
+    
+    return mode_bit;
 }
 
 bool is_valid_file(const char *filename) {
@@ -134,3 +225,5 @@ void error(const char *msg)
     perror(msg);
     exit(0);
 }
+
+
