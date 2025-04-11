@@ -17,10 +17,6 @@ char server_ip[256];
 
 int Mode = 0 ;
 
-int isprint(int c) ;
-
-int isspace(int c) ;
-
 bool is_valid_destination(const char *dest) ;
 
 bool sanitize_command(char * command) ;
@@ -28,6 +24,8 @@ bool sanitize_command(char * command) ;
 bool is_valid_file(const char *filename) ;
 
 void error(const char *msg);
+
+void reset_val(int value) ;
 
 int main(int argc, char *argv[])
 {
@@ -95,10 +93,12 @@ int main(int argc, char *argv[])
             free(command_copy) ;
             error("Invalid Command\n");
         }
-        switch(Mode){
-            case 1 :
 
-        }
+        // TODO : Implemet Dis 
+        // switch(Mode){
+        //     case 1 :
+
+        // }
 
     }
     
@@ -127,24 +127,37 @@ bool sanitize_command(char * command){
         {
             printf("File Exists\n") ;
             char * ext = strrchr(token,'.') ;
-            
+
             if (strcasecmp(ext, ".c") != 0 && strcasecmp(ext, ".pdf") != 0 && strcasecmp(ext, ".txt") != 0 && strcasecmp(ext, ".zip") != 0)
             {
                 // printf(ext) ;                // DEBUG
                 printf("Invalid File Extension\n") ;
                 return false ;
             }
+
             token = strtok(NULL," ") ;
             // printf(token) ;                     // DEBUG
             if(!is_valid_destination(token)) {
                 printf("Please enter a valid Destination Path\n") ;
+                reset_val(Mode);
                 return false ;
             }
             return true ;
         }else{
+            reset_val(Mode);
             return false ;
         }
-    }else if(strcasecmp(token,"uploadf")==0)
+    }else if(strcasecmp(token,"downlf")==0){
+        Mode = 2 ;
+        token = strtok(NULL," ") ;
+        if (token != NULL) {
+            token[strcspn(token, "\n")] = '\0';
+        }else{
+            reset_val(Mode) ;
+            return false ;
+        }
+        // printf(token) ;                             // DEBUG
+    }
     
     return true ;
 }
@@ -197,4 +210,8 @@ bool is_valid_destination(const char *dest) {
     }
 
     return true;
+}
+
+void reset_val(int value){
+    value = 0 ;
 }
