@@ -17,6 +17,12 @@ char server_ip[256];
 
 int Mode = 0 ;
 
+int isprint(int c) ;
+
+int isspace(int c) ;
+
+bool is_valid_destination(const char *dest) ;
+
 bool sanitize_command(char * command) ;
 
 bool is_valid_file(const char *filename) ;
@@ -62,7 +68,7 @@ int main(int argc, char *argv[])
     if (connect(sockfd,(struct sockaddr *) &serv_addr,sizeof(serv_addr)) < 0) 
         error("ERROR connecting");
 
-    printf("\n------ Connected to Laddu ------\n") ;
+    printf("\n------ Connected to Lord ------\n") ;
 
     while (true)
     {
@@ -85,12 +91,13 @@ int main(int argc, char *argv[])
         strcpy(command_copy, command) ;
 
         if(!sanitize_command(command_copy)){
+            Mode = 0 ;
             free(command_copy) ;
             error("Invalid Command\n");
         }
         switch(Mode){
             case 1 :
-
+            
         }
 
     }
@@ -128,8 +135,8 @@ bool sanitize_command(char * command){
                 return false ;
             }
             token = strtok(NULL," ") ;
-
-            if(!is_valid_destination()) {
+            // printf(token) ;                     // DEBUG
+            if(!is_valid_destination(token)) {
                 printf("Please enter a valid Destination Path\n") ;
                 return false ;
             }
@@ -148,4 +155,58 @@ bool is_valid_file(const char *filename) {
         return true;
     }
     return false;
+}
+
+bool is_valid_destination(const char *dest) {
+
+    if (dest == NULL || dest[0] == '\0')
+        return false;
+
+    size_t len = strlen(dest);
+    if (len > 4096)
+        return false;
+
+    for (size_t i = 0; i < len; i++) {
+        char c = dest[i];
+
+        if (c < 32 || c > 126)
+            return false;
+
+        if (c == '\\')
+            return false;
+
+        if (!((c >= 'A' && c <= 'Z') ||
+              (c >= 'a' && c <= 'z') ||
+              (c >= '0' && c <= '9') ||
+              c == '/' ||
+              c == '-' ||
+              c == '_' ||
+              c == '.' ||
+              c == ' '))
+        {
+            return false;
+        }
+    }
+
+    if (strcmp(dest, "/") != 0) { 
+        for (size_t i = 0; i < len - 1; i++) {
+            if (dest[i] == '/' && dest[i + 1] == '/')
+                return false;
+        }
+    }
+
+    return true;
+}
+
+int isprint(int c) {
+    return (c >= 32 && c <= 126);
+}
+
+int isspace(int c) {
+    return (c == ' '  ||
+            c == '\t' ||
+            c == '\n' ||
+            c == '\v' ||
+            c == '\f' ||
+            c == '\r');
 }
