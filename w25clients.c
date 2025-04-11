@@ -97,7 +97,7 @@ int main(int argc, char *argv[])
         }
         switch(Mode){
             case 1 :
-            
+
         }
 
     }
@@ -196,17 +196,4 @@ bool is_valid_destination(const char *dest) {
     }
 
     return true;
-}
-
-int isprint(int c) {
-    return (c >= 32 && c <= 126);
-}
-
-int isspace(int c) {
-    return (c == ' '  ||
-            c == '\t' ||
-            c == '\n' ||
-            c == '\v' ||
-            c == '\f' ||
-            c == '\r');
 }
