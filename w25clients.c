@@ -140,6 +140,7 @@ bool sanitize_command(char * command){
                 printf("Please enter a valid Destination Path\n") ;
                 return false ;
             }
+            return true ;
         }else{
             return false ;
         }
