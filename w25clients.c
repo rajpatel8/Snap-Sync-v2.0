@@ -228,9 +228,66 @@ int main(int argc, char *argv[]) {
                 fprintf(stderr, "Error writing downloaded file\n");
             }
             free(filebuf);
+        }else if (strcasecmp(cmd, "downltar") == 0) {
+            // Expected syntax: downltar <filetype>
+            char filetype[10];
+            sscanf(buffer, "%*s %s", filetype);
+            
+            // Determine output filename based on filetype
+            char tarname[20];
+            if (strcasecmp(filetype, ".c") == 0)
+                strcpy(tarname, "cfiles.tar");
+            else if (strcasecmp(filetype, ".pdf") == 0)
+                strcpy(tarname, "pdffiles.tar");
+            else if (strcasecmp(filetype, ".txt") == 0)
+                strcpy(tarname, "txtfiles.tar");
+            else if (strcasecmp(filetype, ".zip") == 0)
+                strcpy(tarname, "zipfiles.tar");
+            else {
+                fprintf(stderr, "Invalid filetype for tar\n");
+                continue;
+            }
+            
+            // Receive filesize header
+            uint32_t net_filesize;
+            n = recv_all(sockfd, &net_filesize, sizeof(net_filesize));
+            if(n != sizeof(net_filesize)) {
+                fprintf(stderr, "Error receiving tar filesize\n");
+                continue;
+            }
+            
+            int filesize = ntohl(net_filesize);
+            if(filesize <= 0) {
+                fprintf(stderr, "Server returned error or empty tar file\n");
+                continue;
+            }
+            
+            // Allocate buffer and receive tar data
+            char *filebuf = malloc(filesize);
+            if(!filebuf) {
+                fprintf(stderr, "Memory allocation error\n");
+                continue;
+            }
+            
+            if(recv_all(sockfd, filebuf, filesize) != filesize) {
+                fprintf(stderr, "Error receiving tar file data\n");
+                free(filebuf);
+                continue;
+            }
+            
+            // Save the tar file
+            FILE *fp = fopen(tarname, "wb");
+            if(fp) {
+                fwrite(filebuf, 1, filesize, fp);
+                fclose(fp);
+                printf("Downloaded tar file saved as %s\n", tarname);
+            } else {
+                fprintf(stderr, "Error writing tar file\n");
+            }
+            free(filebuf);
         }
         else {
-            // For removef, downltar, dispfnames, simply print the response.
+            // For removef, dispfnames, simply print the response
             memset(buffer, 0, BUFSIZE);
             n = recv(sockfd, buffer, BUFSIZE-1, 0);
             if(n > 0)
