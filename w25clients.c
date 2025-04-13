@@ -1,217 +1,243 @@
+/*
+    w25clients.c
+    A sample client for the distributed file system.
+    Usage: ./w25clients <S1_hostname> <S1_port>
+*/
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
 #include <string.h>
 #include <sys/types.h>
 #include <sys/socket.h>
-#include <netinet/in.h>
-#include <netdb.h> 
+#include <netdb.h>
+#include <arpa/inet.h>
+#include <stdint.h>
+#include <errno.h>
 
-#define bool int
-#define true 1
-#define false 0
+#define BUFSIZE 1024
 
-// Global variables to store server information
-char server_hostname[256];
-char server_ip[256];
+/* Utility routines */
+void error(const char *msg) {
+    perror(msg);
+    exit(1);
+}
 
-int Mode = 0 ;
+/* Checks that the filename exists and has a valid extension */
+int is_valid_file(const char *filename) {
+    FILE *fp = fopen(filename, "rb");
+    if (fp) {
+        fclose(fp);
+        return 1;
+    }
+    return 0;
+}
 
-bool is_valid_destination(const char *dest) ;
+/* A simple command sanitization function. In this example, we
+   only minimally check for the valid commands. */
+int sanitize_command(char *command) {
+    // Acceptable commands: uploadf, downlf, removef, downltar, dispfnames
+    char *token = strtok(command, " ");
+    if (!token)
+        return -1;
+    if (strcasecmp(token, "uploadf") == 0 ||
+        strcasecmp(token, "downlf") == 0 ||
+        strcasecmp(token, "removef") == 0 ||
+        strcasecmp(token, "downltar") == 0 ||
+        strcasecmp(token, "dispfnames") == 0) {
+        return 0;
+    }
+    return -1;
+}
 
-bool sanitize_command(char * command) ;
+/* send_all ensures that all N bytes are sent */
+ssize_t send_all(int sockfd, const void *buf, size_t len) {
+    size_t total = 0;
+    const char *p = buf;
+    while(total < len) {
+        ssize_t n = send(sockfd, p+total, len-total, 0);
+        if(n <= 0) {
+            return n;
+        }
+        total += n;
+    }
+    return total;
+}
 
-bool is_valid_file(const char *filename) ;
+/* recv_all ensures that all N bytes are received */
+ssize_t recv_all(int sockfd, void *buf, size_t len) {
+    size_t total = 0;
+    char *p = buf;
+    while(total < len) {
+        ssize_t n = recv(sockfd, p+total, len-total, 0);
+        if(n <= 0) {
+            return n;
+        }
+        total += n;
+    }
+    return total;
+}
 
-void error(const char *msg);
-
-void reset_val(int value) ;
-
-int main(int argc, char *argv[])
-{
-    // signal(SIGCHLD,SIG_IGN) ;
+int main(int argc, char *argv[]) {
     int sockfd, portno, n;
     struct sockaddr_in serv_addr;
     struct hostent *server;
-    
-    char buffer[256];
+    char buffer[BUFSIZE];
 
     if (argc < 3) {
-       fprintf(stderr,"usage %s hostname port\n", argv[0]);
+       fprintf(stderr, "usage %s hostname port\n", argv[0]);
        exit(0);
     }
-
+    
     portno = atoi(argv[2]);
     sockfd = socket(AF_INET, SOCK_STREAM, 0);
-
     if (sockfd < 0) 
         error("ERROR opening socket");
+    
     server = gethostbyname(argv[1]);
-
     if (server == NULL) {
         fprintf(stderr,"ERROR, no such host\n");
         exit(0);
     }
-
-    bzero((char *) &serv_addr, sizeof(serv_addr));
-
+    
+    memset((char *)&serv_addr, 0, sizeof(serv_addr));
     serv_addr.sin_family = AF_INET;
-
-    bcopy((char *)server->h_addr, 
-         (char *)&serv_addr.sin_addr.s_addr,
-         server->h_length);
-
+    memcpy(&serv_addr.sin_addr.s_addr, server->h_addr, server->h_length);
     serv_addr.sin_port = htons(portno);
-
-    if (connect(sockfd,(struct sockaddr *) &serv_addr,sizeof(serv_addr)) < 0) 
+    
+    if (connect(sockfd,(struct sockaddr *) &serv_addr, sizeof(serv_addr)) < 0) 
         error("ERROR connecting");
+    
+    printf("\n------ Connected to S1 ------\n");
 
-    printf("\n------ Connected to Lord ------\n") ;
-
-    while (true)
-    {
+    while (1) {
+        printf("Delta ~ $ ");
+        memset(buffer, 0, BUFSIZE);
+        if (fgets(buffer, BUFSIZE, stdin) == NULL)
+            break;
+        // Remove trailing newline.
+        buffer[strcspn(buffer, "\n")] = '\0';
         
-        printf("Delta ~ $ ") ;
-
-        char command[256] ;
-
-        bzero(command,256);
-        fgets(command,sizeof(command),stdin) ;
-        command[strcspn(command, "\n")] = '\0'; // triming \n bcoz it causes error in later part
+        // Make a copy for validation.
+        char command_copy[BUFSIZE];
+        strncpy(command_copy, buffer, BUFSIZE);
+        if (sanitize_command(command_copy) != 0) {
+            fprintf(stderr, "Invalid command\n");
+            continue;
+        }
         
-        char * command_copy = malloc(sizeof(command)+1) ;
-
-        if (command_copy == NULL) {
-            fprintf(stderr, "Memory allocation failed\n");
-            exit(1);
+        // Send the command string to S1.
+        if(send_all(sockfd, buffer, strlen(buffer)) < (ssize_t)strlen(buffer)) {
+            error("ERROR sending command");
         }
-
-        strcpy(command_copy, command) ;
-
-        if(!sanitize_command(command_copy)){
-            Mode = 0 ;
-            free(command_copy) ;
-            error("Invalid Command\n");
+        
+        // Determine command type.
+        char cmd[32];
+        sscanf(buffer, "%s", cmd);
+        if (strcasecmp(cmd, "uploadf") == 0) {
+            // Expected syntax: uploadf <filename> <destination_path>
+            char filename[256], dest[256];
+            if (sscanf(buffer, "%*s %s %s", filename, dest) != 2) {
+                fprintf(stderr, "Invalid uploadf syntax\n");
+                continue;
+            }
+            if (!is_valid_file(filename)) {
+                fprintf(stderr, "File does not exist.\n");
+                continue;
+            }
+            // Open the file.
+            FILE *fp = fopen(filename, "rb");
+            if (!fp) {
+                perror("Error opening file");
+                continue;
+            }
+            fseek(fp, 0, SEEK_END);
+            long filesize = ftell(fp);
+            rewind(fp);
+            char *filebuf = malloc(filesize);
+            if (!filebuf) {
+                fprintf(stderr, "Memory allocation error\n");
+                fclose(fp);
+                continue;
+            }
+            fread(filebuf, 1, filesize, fp);
+            fclose(fp);
+            
+            // Wait for S1 to reply with "READY"
+            memset(buffer, 0, BUFSIZE);
+            n = recv(sockfd, buffer, BUFSIZE-1, 0);
+            if(n <= 0 || strncmp(buffer, "READY", 5) != 0) {
+                fprintf(stderr, "Server not ready for file data\n");
+                free(filebuf);
+                continue;
+            }
+            // Send file size as a 4-byte integer.
+            uint32_t net_filesize = htonl(filesize);
+            if(send_all(sockfd, &net_filesize, sizeof(net_filesize)) < sizeof(net_filesize)) {
+                error("Error sending filesize");
+            }
+            // Send the file data.
+            if(send_all(sockfd, filebuf, filesize) < filesize) {
+                error("Error sending file data");
+            }
+            free(filebuf);
+            // Get server acknowledgment.
+            memset(buffer, 0, BUFSIZE);
+            n = recv(sockfd, buffer, BUFSIZE-1, 0);
+            if(n > 0)
+                printf("Server: %s\n", buffer);
         }
-
-        // TODO : Implemet Dis 
-        // switch(Mode){
-        //     case 1 :
-
-        // }
-
+        else if (strcasecmp(cmd, "downlf") == 0) {
+            // Expected syntax: downlf <filepath>
+            // S1 will send first a 4-byte filesize, then the raw file data.
+            uint32_t net_filesize;
+            n = recv_all(sockfd, &net_filesize, sizeof(net_filesize));
+            if(n != sizeof(net_filesize)) {
+                fprintf(stderr, "Error receiving filesize\n");
+                continue;
+            }
+            int filesize = ntohl(net_filesize);
+            if(filesize <= 0) {
+                fprintf(stderr, "Server returned error or empty file\n");
+                continue;
+            }
+            char *filebuf = malloc(filesize);
+            if(!filebuf) {
+                fprintf(stderr, "Memory allocation error\n");
+                continue;
+            }
+            if(recv_all(sockfd, filebuf, filesize) != filesize) {
+                fprintf(stderr, "Error receiving file data\n");
+                free(filebuf);
+                continue;
+            }
+            // Save the downloaded file locally.
+            // For simplicity, we extract the filename from the path.
+            char filepath[256];
+            sscanf(buffer, "%*s %s", filepath);
+            char *fname = strrchr(filepath, '/');
+            if(fname)
+                fname++; 
+            else
+                fname = filepath;
+            FILE *fp = fopen(fname, "wb");
+            if(fp) {
+                fwrite(filebuf, 1, filesize, fp);
+                fclose(fp);
+                printf("Downloaded file saved as %s\n", fname);
+            } else {
+                fprintf(stderr, "Error writing downloaded file\n");
+            }
+            free(filebuf);
+        }
+        else {
+            // For removef, downltar, dispfnames, simply print the response.
+            memset(buffer, 0, BUFSIZE);
+            n = recv(sockfd, buffer, BUFSIZE-1, 0);
+            if(n > 0)
+                printf("Server: %s\n", buffer);
+        }
     }
     
-    
+    close(sockfd);
     return 0;
-}
-
-void error(const char *msg){
-    perror(msg);
-    // exit(0);
-}
-
-bool sanitize_command(char * command){
-    char * token = strtok(command , " ") ;
-    // printf(command) ;                        // DEBUG  
-                 
-    if (strcasecmp(token,"uploadf")==0)
-    {
-        Mode = 1 ;
-        token = strtok(NULL," ") ;
-        if (token != NULL) {
-            token[strcspn(token, "\n")] = '\0';
-        }
-
-        if (is_valid_file(token))
-        {
-            printf("File Exists\n") ;
-            char * ext = strrchr(token,'.') ;
-
-            if (strcasecmp(ext, ".c") != 0 && strcasecmp(ext, ".pdf") != 0 && strcasecmp(ext, ".txt") != 0 && strcasecmp(ext, ".zip") != 0)
-            {
-                // printf(ext) ;                // DEBUG
-                printf("Invalid File Extension\n") ;
-                return false ;
-            }
-
-            token = strtok(NULL," ") ;
-            // printf(token) ;                     // DEBUG
-            if(!is_valid_destination(token)) {
-                printf("Please enter a valid Destination Path\n") ;
-                reset_val(Mode);
-                return false ;
-            }
-            return true ;
-        }else{
-            reset_val(Mode);
-            return false ;
-        }
-    }else if(strcasecmp(token,"downlf")==0){
-        Mode = 2 ;
-        token = strtok(NULL," ") ;
-        if (token != NULL) {
-            token[strcspn(token, "\n")] = '\0';
-        }else{
-            reset_val(Mode) ;
-            return false ;
-        }
-        // printf(token) ;                             // DEBUG
-    }
-    
-    return true ;
-}
-
-bool is_valid_file(const char *filename) {
-    FILE *file = fopen(filename, "r");
-    if (file) {
-        fclose(file);
-        return true;
-    }
-    return false;
-}
-
-bool is_valid_destination(const char *dest) {
-
-    if (dest == NULL || dest[0] == '\0')
-        return false;
-
-    size_t len = strlen(dest);
-    if (len > 4096)
-        return false;
-
-    for (size_t i = 0; i < len; i++) {
-        char c = dest[i];
-
-        if (c < 32 || c > 126)
-            return false;
-
-        if (c == '\\')
-            return false;
-
-        if (!((c >= 'A' && c <= 'Z') ||
-              (c >= 'a' && c <= 'z') ||
-              (c >= '0' && c <= '9') ||
-              c == '/' ||
-              c == '-' ||
-              c == '_' ||
-              c == '.' ||
-              c == ' '))
-        {
-            return false;
-        }
-    }
-
-    if (strcmp(dest, "/") != 0) { 
-        for (size_t i = 0; i < len - 1; i++) {
-            if (dest[i] == '/' && dest[i + 1] == '/')
-                return false;
-        }
-    }
-
-    return true;
-}
-
-void reset_val(int value){
-    value = 0 ;
 }
