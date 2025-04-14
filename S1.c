@@ -1,17 +1,17 @@
 /*
-    S1.c
-    S1 acts as the front‐end server. It accepts client connections and processes commands.
-    
-    For uploads:
-      - .c files are stored locally under ./S1.
-      - Other file types (.pdf, .txt, .zip) are forwarded to the appropriate remote server.
-    
-    For downloads, removals, tar archives, and file-name display:
-      - If the file (or file type) is .c, S1 handles it locally.
-      - Otherwise, S1 forwards the entire command to the proper remote server and relays the response.
-    
-    Compile with: gcc -o S1 S1.c
-*/
+ * Name - 1    : Rajkumar Patel - 110184076
+ * Name - 2    : Vansh Patel    - 110176043
+ * Project     : W25_Project - Distributed File System
+ * File        : S1.c
+ * Author      : lord_rajkumar
+ * Co-Author   : vansh7388
+ * GitHub      : https://github.com/rajpatel8/Snap-Sync-v2.0
+ * Description : Main server S1. Handles client connections, stores .c files locally,
+ *               and dispatches .pdf, .txt, and .zip files to S2, S3, and S4 respectively.
+ * License     : MIT License
+ *
+ * (c) 2025 lord_rajkumar. All rights reserved.
+ */
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -27,22 +27,20 @@
 
 #define BUFSIZE 1024
 
-/*---------------- Utility Functions ----------------*/
-
-/* Print error message and exit */
+// print error
 void error(const char *msg) {
     perror(msg);
     exit(1);
 }
 
-/* Ensure a directory exists, if not, create it using a system call to mkdir -p */
+// create directory if it does not exist
 void ensure_directory(const char *path) {
     char cmd[512];
     snprintf(cmd, sizeof(cmd), "mkdir -p %s", path);
     system(cmd);
 }
 
-/* send_all ensures that all len bytes from buf are sent through sockfd */
+// send all bytes
 ssize_t send_all(int sockfd, const void *buf, size_t len) {
     size_t total = 0;
     const char *p = buf;
@@ -54,7 +52,7 @@ ssize_t send_all(int sockfd, const void *buf, size_t len) {
     return total;
 }
 
-/* recv_all ensures that all len bytes are received from sockfd into buf */
+// receive all bytes
 ssize_t recv_all(int sockfd, void *buf, size_t len) {
     size_t total = 0;
     char *p = buf;
@@ -66,10 +64,7 @@ ssize_t recv_all(int sockfd, void *buf, size_t len) {
     return total;
 }
 
-/* Forward an uploaded non-.c file from S1 to the appropriate remote server.
-   The function connects to the remote server (given by server_port), sends a
-   "storef" command along with destination and filename, then sends the filesize
-   header and raw file data. */
+// forward file to remote server if not .c file
 int forward_file(int server_port, const char *dest, const char *filename, char *filebuf, int filesize) {
     int sockfd;
     struct sockaddr_in serv_addr;
@@ -83,7 +78,6 @@ int forward_file(int server_port, const char *dest, const char *filename, char *
     memset(&serv_addr, 0, sizeof(serv_addr));
     serv_addr.sin_family = AF_INET;
     serv_addr.sin_port = htons(server_port);
-    // Assuming remote servers are on localhost
     serv_addr.sin_addr.s_addr = inet_addr("127.0.0.1");
     
     if(connect(sockfd, (struct sockaddr *)&serv_addr, sizeof(serv_addr)) < 0) {
@@ -91,14 +85,14 @@ int forward_file(int server_port, const char *dest, const char *filename, char *
         close(sockfd);
         return -1;
     }
-    // Build command: "storef <destination> <filename>"
+    // build command: "storef <destination> <filename>"
     snprintf(buf, sizeof(buf), "storef %s %s", dest, filename);
     if(send(sockfd, buf, strlen(buf), 0) < 0) {
         perror("Error sending store command");
         close(sockfd);
         return -1;
     }
-    // Wait for remote server to respond with "READY"
+    // Wait for respond with "READY"
     memset(buf, 0, sizeof(buf));
     if(recv(sockfd, buf, sizeof(buf)-1, 0) <= 0) {
         perror("No READY response from forwarding server");
@@ -125,15 +119,14 @@ int forward_file(int server_port, const char *dest, const char *filename, char *
             break;
         sent += n;
     }
-    // Optionally, read acknowledgement (if any) before closing.
+    // Oread acknowledgment
     memset(buf, 0, sizeof(buf));
     recv(sockfd, buf, sizeof(buf)-1, 0);
     close(sockfd);
     return 0;
 }
 
-/*---------------- S1 Main Client-Handler Function ----------------*/
-
+// main handler for client 
 void prcclient(int client_sock) {
     char buffer[BUFSIZE];
     int n;
@@ -143,24 +136,24 @@ void prcclient(int client_sock) {
         if(n <= 0) break;
         buffer[n] = '\0';
         
-        // Determine the command.
+        // fstore command
         char cmd[32];
         sscanf(buffer, "%s", cmd);
         
         if(strcasecmp(cmd, "uploadf") == 0) {
-            // Expected: uploadf <filename> <destination_path>
+            // expected: uploadf <filename> <destination_path>
             char filename[256], dest[256];
             if(sscanf(buffer, "%*s %s %s", filename, dest) != 2) {
                 send(client_sock, "Invalid command syntax\n", 23, 0);
                 continue;
             }
-            // Check file extension.
+            // check extension
             char *ext = strrchr(filename, '.');
             if(!ext) {
                 send(client_sock, "Invalid file extension\n", 23, 0);
                 continue;
             }
-            // Tell client "READY" to send file data.
+            // send "READY" to client
             send(client_sock, "READY", 5, 0);
             // Receive filesize header.
             uint32_t net_filesize;
@@ -181,11 +174,11 @@ void prcclient(int client_sock) {
                 if(n <= 0) break;
                 received += n;
             }
-            // If file is a .c file, store it locally.
+            // if file is .c file, store it locally.
             if(strcasecmp(ext, ".c") == 0) {
                 char base[256] = "./S1";
                 char fullpath[512];
-                // Remove "~S1" if present.
+                // remove "~S1" if present.
                 char *subpath = strstr(dest, "~S1");
                 if(subpath)
                     subpath += 3;
@@ -205,7 +198,7 @@ void prcclient(int client_sock) {
                 }
             }
             else {
-                // Non-.c files are forwarded.
+                // non-.c files are forwarded to respective servers.
                 int target_port = 0;
                 if(strcasecmp(ext, ".pdf") == 0)
                     target_port = 9002;
@@ -226,7 +219,7 @@ void prcclient(int client_sock) {
             free(filebuf);
         }
         else if(strcasecmp(cmd, "downlf") == 0) {
-            // Expected: downlf <filepath>
+            // expected: downlf <filepath>
             char filepath[512];
             if(sscanf(buffer, "%*s %s", filepath) != 1) {
                 send(client_sock, "Invalid command syntax\n", 23, 0);
@@ -238,7 +231,7 @@ void prcclient(int client_sock) {
                 continue;
             }
             if(strcasecmp(ext, ".c") == 0) {
-                // Local download from ./S1.
+                // local download from ./S1.
                 char localpath[600];
                 snprintf(localpath, sizeof(localpath), "./S1%s", (strstr(filepath, "~S1") ? filepath+3 : filepath));
                 FILE *fp = fopen(localpath, "rb");
@@ -258,7 +251,7 @@ void prcclient(int client_sock) {
                 fclose(fp);
             }
             else {
-                // Forward the download request to the correct remote server.
+                // forward download request to respective servers.
                 int target_port = 0;
                 if(strcasecmp(ext, ".pdf") == 0)
                     target_port = 9002;
@@ -285,13 +278,13 @@ void prcclient(int client_sock) {
                     close(sock_remote);
                     continue;
                 }
-                // Send the same downlf command received from the client.
+                // Send downlf command.
                 if(send_all(sock_remote, buffer, strlen(buffer)) < (ssize_t)strlen(buffer)) {
                     perror("Error sending remote downlf command");
                     close(sock_remote);
                     continue;
                 }
-                // Receive file size from remote server and relay it.
+                // receive filesize header.
                 uint32_t net_filesize_remote;
                 if(recv_all(sock_remote, &net_filesize_remote, sizeof(net_filesize_remote)) != sizeof(net_filesize_remote)) {
                     send(client_sock, "Error receiving filesize from remote server\n", 45, 0);
@@ -312,7 +305,7 @@ void prcclient(int client_sock) {
             }
         }
         else if(strcasecmp(cmd, "removef") == 0) {
-            // Expected: removef <filepath>
+            // expected: removef <filepath>
             char filepath[512];
             if(sscanf(buffer, "%*s %s", filepath) != 1) {
                 send(client_sock, "Invalid command syntax\n", 23, 0);
@@ -323,6 +316,7 @@ void prcclient(int client_sock) {
                 send(client_sock, "Invalid file extension\n", 23, 0);
                 continue;
             }
+            // remove local file if .c
             if(strcasecmp(ext, ".c") == 0) {
                 char localpath[600];
                 snprintf(localpath, sizeof(localpath), "./S1%s", (strstr(filepath, "~S1") ? filepath+3 : filepath));
@@ -331,6 +325,7 @@ void prcclient(int client_sock) {
                 else
                     send(client_sock, "Error removing file\n", 21, 0);
             }
+            // forward remove request to respective servers.
             else {
                 int target_port = 0;
                 if(strcasecmp(ext, ".pdf") == 0)
@@ -368,14 +363,14 @@ void prcclient(int client_sock) {
             }
         }
         else if(strcasecmp(cmd, "downltar") == 0) {
-            // Expected: downltar <filetype>
+            // expected: downltar <filetype>
             char filetype[10];
             if(sscanf(buffer, "%*s %s", filetype) != 1) {
                 send(client_sock, "Invalid command syntax\n", 23, 0);
                 continue;
             }
             if(strcasecmp(filetype, ".c") == 0) {
-                // Create tar archive from ./S1 for C files
+                // create tar of all .c files in ./S1
                 char tarname[20];
                 strcpy(tarname, "cfiles.tar");
                 char cmdline[600];
@@ -397,6 +392,7 @@ void prcclient(int client_sock) {
                 fclose(fp);
                 remove(tarname);
             }
+            // forward request to respective server
             else {
                 int target_port = 0;
                 if(strcasecmp(filetype, ".pdf") == 0)
@@ -452,22 +448,20 @@ void prcclient(int client_sock) {
                 send(client_sock, "Invalid command syntax\n", 23, 0);
                 continue;
             }
-            // Normalize the sub-path: remove "~S1" and if only "/" remains, use an empty string.
+            // build path
             char subpath[512] = "";
             char *p = strstr(pathname, "~S1");
             if (p != NULL) {
-                p += 3; // Skip "~S1"
-                // If the remaining string is "/" or empty, set subpath to empty.
+                p += 3; // skip "~S1"
                 if (strcmp(p, "/") != 0 && strlen(p) > 0)
                     strncpy(subpath, p, sizeof(subpath) - 1);
             } else {
                 strncpy(subpath, pathname, sizeof(subpath) - 1);
             }
-            // Construct local path: S1's base directory is "./S1"
             char local_path[600];
             snprintf(local_path, sizeof(local_path), "./S1%s", subpath);
             
-            // Execute the find command using popen().
+            // execute file command
             char find_cmd[700];
             snprintf(find_cmd, sizeof(find_cmd), "find %s -maxdepth 1 -type f | sort", local_path);
             FILE *fp = popen(find_cmd, "r");
@@ -483,7 +477,7 @@ void prcclient(int client_sock) {
                 strncat(combined, "Error listing local files\n", sizeof(combined)-strlen(combined)-1);
             }
             
-            // Query remote servers (S2, S3, and S4)
+            // get file names from remote servers
             int remote_ports[3] = {9002, 9003, 9004};
             for (int i = 0; i < 3; i++) {
                 int sock_remote = socket(AF_INET, SOCK_STREAM, 0);
@@ -498,7 +492,7 @@ void prcclient(int client_sock) {
                     close(sock_remote);
                     continue;
                 }
-                // Forward the same dispfnames command from the client.
+                // forward command to remote server
                 if (send_all(sock_remote, buffer, strlen(buffer)) < (ssize_t)strlen(buffer)) {
                     close(sock_remote);
                     continue;
@@ -524,18 +518,20 @@ void prcclient(int client_sock) {
     close(client_sock);
 }
 
-/*---------------- Main Function: Accept and Fork ----------------*/
-
+// main function
 int main(int argc, char *argv[]){
     int sockfd, newsockfd, portno;
     pid_t pid;
     struct sockaddr_in serv_addr, cli_addr;
     socklen_t clilen;
     
+    // get port number from command line
     if(argc < 2) {
        fprintf(stderr, "Usage: %s port\n", argv[0]);
        exit(1);
     }
+
+    // add port and ip address
     portno = atoi(argv[1]);
     sockfd = socket(AF_INET, SOCK_STREAM, 0);
     if(sockfd < 0)
@@ -545,18 +541,23 @@ int main(int argc, char *argv[]){
     serv_addr.sin_addr.s_addr = INADDR_ANY;
     serv_addr.sin_port = htons(portno);
     
+    // bind socket to port
     if(bind(sockfd, (struct sockaddr *)&serv_addr, sizeof(serv_addr)) < 0)
          error("ERROR on binding");
+    
+    // listen for incoming connections
     listen(sockfd, 5);
     clilen = sizeof(cli_addr);
+
+    // accept connections
     while(1) {
        newsockfd = accept(sockfd, (struct sockaddr *)&cli_addr, &clilen);
        if(newsockfd < 0)
            error("ERROR on accept");
-       pid = fork();
+       pid = fork(); // fork process for each connection
        if(pid < 0)
            error("ERROR on fork");
-       if(pid == 0) { // Child process
+       if(pid == 0) { 
           close(sockfd);
           prcclient(newsockfd);
           exit(0);

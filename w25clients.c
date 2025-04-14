@@ -1,8 +1,4 @@
-/*
-    w25clients.c
-    A sample client for the distributed file system.
-    Usage: ./w25clients <S1_hostname> <S1_port>
-*/
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
@@ -32,8 +28,7 @@ int is_valid_file(const char *filename) {
     return 0;
 }
 
-/* A simple command sanitization function. In this example, we
-   only minimally check for the valid commands. */
+
 int sanitize_command(char *command) {
     // Acceptable commands: uploadf, downlf, removef, downltar, dispfnames
     char *token = strtok(command, " ");

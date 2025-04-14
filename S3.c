@@ -1,14 +1,18 @@
 /*
-    S3.c
-    S3 stores TXT files. It listens on port 9003.
-    It supports the following commands:
-      - storef <destination> <filename>
-      - downlf <filepath>
-      - removef <filepath>
-      - downltar <filetype>   (for TXT files, expected filetype is ".txt")
-      - dispfnames <pathname>
-    Compile with: gcc -o S3 S3.c
-*/
+ * Name - 1    : Rajkumar Patel - 110184076
+ * Name - 2    : Vansh Patel    - 110176043
+ * 
+ * Project     : W25_Project - Distributed File System
+ * File        : S3.c
+ * Author      : lord_rajkumar
+ * Co-Author   : vansh7388
+ * GitHub      : https://github.com/rajpatel8/Snap-Sync-v2.0
+ * Description : Server S3. Receives and stores .txt files that are transferred from S1.
+ * License     : MIT License
+ *
+ * (c) 2025 lord_rajkumar. All rights reserved.
+ */
+
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -66,7 +70,7 @@ void prcclient(int sock) {
     char cmd[32];
     sscanf(buffer, "%s", cmd);
     
-    /* Base directory for S3 – TXT files */
+
     char base[256] = "./S3";
     
     if (strcasecmp(cmd, "storef") == 0) {
@@ -197,14 +201,14 @@ void prcclient(int sock) {
         remove(tarname);
     }
     else if (strcasecmp(cmd, "dispfnames") == 0) {
-        // Expected: dispfnames <pathname>
+
         char pathname[512];
         if (sscanf(buffer, "%*s %s", pathname) != 1) {
             send(sock, "Invalid command syntax\n", 23, 0);
             close(sock);
             return;
         }
-        // Normalize the sub-path by stripping "~S1"
+
         char subpath[512] = "";
         char *p = strstr(pathname, "~S1");
         if (p != NULL) {
@@ -214,8 +218,7 @@ void prcclient(int sock) {
         } else {
             strncpy(subpath, pathname, sizeof(subpath)-1);
         }
-        // Assume the base directory has already been defined; for instance:
-        // For S2: char base[256] = "./S2";
+
         char fullpath[600];
         snprintf(fullpath, sizeof(fullpath), "%s%s", base, subpath);
         

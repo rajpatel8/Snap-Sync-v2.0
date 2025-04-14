@@ -1,14 +1,18 @@
 /*
-    S4.c
-    S4 stores ZIP files. It listens on port 9004.
-    It supports the following commands:
-      - storef <destination> <filename>
-      - downlf <filepath>
-      - removef <filepath>
-      - downltar <filetype>   (for ZIP files, expected filetype is ".zip")
-      - dispfnames <pathname>
-    Compile with: gcc -o S4 S4.c
-*/
+ * Name - 1    : Rajkumar Patel - 110184076
+ * Name - 2    : Vansh Patel    - 110176043
+ * 
+ * Project     : W25_Project - Distributed File System
+ * File        : S4.c
+ * Author      : lord_rajkumar
+ * Co-Author   : vansh7388
+ * GitHub      : https://github.com/rajpatel8/Snap-Sync-v2.0
+ * Description : Server S4. Receives and stores .zip files that are transferred from S1.
+ * License     : MIT License
+ *
+ * (c) 2025 lord_rajkumar. All rights reserved.
+ */
+
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -24,17 +28,20 @@
 
 #define BUFSIZE 1024
 
+// print error
 void error(const char *msg) {
     perror(msg);
     exit(1);
 }
 
+// create directory if it does not exist
 void ensure_directory(const char *path) {
     char cmd[512];
     snprintf(cmd, sizeof(cmd), "mkdir -p %s", path);
     system(cmd);
 }
 
+// send all bytes
 void send_all(int sock, const void *buf, size_t len) {
     size_t total = 0;
     const char *p = buf;
@@ -45,6 +52,7 @@ void send_all(int sock, const void *buf, size_t len) {
     }
 }
 
+// receive all bytes
 ssize_t recv_all(int sock, void *buf, size_t len) {
     size_t total = 0;
     char *p = buf;
@@ -56,6 +64,7 @@ ssize_t recv_all(int sock, void *buf, size_t len) {
     return total;
 }
 
+// main handler for client
 void prcclient(int sock) {
     char buffer[BUFSIZE];
     memset(buffer, 0, BUFSIZE);
@@ -66,11 +75,12 @@ void prcclient(int sock) {
     char cmd[32];
     sscanf(buffer, "%s", cmd);
     
-    /* Base directory for S4 – ZIP files */
+    // base directory for file operations
     char base[256] = "./S4";
     
     if (strcasecmp(cmd, "storef") == 0) {
         char dest[256], filename[256];
+        // expected: storef <destination> <filename>
         if (sscanf(buffer, "%*s %s %s", dest, filename) != 2) {
             send(sock, "Invalid command syntax\n", 23, 0);
             close(sock);
@@ -113,6 +123,7 @@ void prcclient(int sock) {
     }
     else if (strcasecmp(cmd, "downlf") == 0) {
         char filepath_rel[512];
+        // expected: downlf <filepath>
         if(sscanf(buffer, "%*s %s", filepath_rel) != 1) {
             send(sock, "Invalid command syntax\n", 23, 0);
             close(sock);
@@ -144,6 +155,7 @@ void prcclient(int sock) {
     }
     else if (strcasecmp(cmd, "removef") == 0) {
         char filepath_rel[512];
+        // expected: removef <filepath>
         if(sscanf(buffer, "%*s %s", filepath_rel) != 1) {
             send(sock, "Invalid command syntax\n", 23, 0);
             close(sock);
@@ -197,14 +209,13 @@ void prcclient(int sock) {
         remove(tarname);
     }
     else if (strcasecmp(cmd, "dispfnames") == 0) {
-        // Expected: dispfnames <pathname>
+        // expected: dispfnames <pathname>
         char pathname[512];
         if (sscanf(buffer, "%*s %s", pathname) != 1) {
             send(sock, "Invalid command syntax\n", 23, 0);
             close(sock);
             return;
         }
-        // Normalize the sub-path by stripping "~S1"
         char subpath[512] = "";
         char *p = strstr(pathname, "~S1");
         if (p != NULL) {
@@ -214,8 +225,7 @@ void prcclient(int sock) {
         } else {
             strncpy(subpath, pathname, sizeof(subpath)-1);
         }
-        // Assume the base directory has already been defined; for instance:
-        // For S2: char base[256] = "./S2";
+        
         char fullpath[600];
         snprintf(fullpath, sizeof(fullpath), "%s%s", base, subpath);
         
