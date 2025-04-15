@@ -1,0 +1,23 @@
+uploadf sample.c ~S1/folder1/folder2
+uploadf sample.pdf ~S1/folder1/folder2
+uploadf sample.txt ~S1/folder1/folder2
+uploadf sample.zip ~S1/folder1/folder2
+
+downlf ~S1/folder1/folder2/sample.c
+downlf ~S1/folder1/folder2/sample.pdf
+downlf ~S1/folder1/folder2/sample.txt
+downlf ~S1/folder1/folder2/sample.zip
+
+downltar .c
+downltar .pdf
+downltar .txt
+downltar .zip
+
+dispfnames ~S1/folder1/folder2
+
+removef ~S1/folder1/folder2/sample.c
+removef ~S1/folder1/folder2/sample.pdf
+removef ~S1/folder1/folder2/sample.txt
+removef ~S1/folder1/folder2/sample.zip
+
+
