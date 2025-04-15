@@ -30,7 +30,7 @@ int is_valid_file(const char *filename) {
 
 
 int sanitize_command(char *command) {
-    // Acceptable commands: uploadf, downlf, removef, downltar, dispfnames
+    // Accept cmd: uploadf, downlf, removef, downltar, dispfnames
     char *token = strtok(command, " ");
     if (!token)
         return -1;

@@ -55,3 +55,8 @@ S1
 temp.txt
 server
 .DS_Store
+.vscode/settings.json
+server_1
+server_2
+server_3
+.gitignore
