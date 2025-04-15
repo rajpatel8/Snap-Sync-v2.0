@@ -1,12 +1,12 @@
-uploadf sample.c ~S1/folder1/folder2
-uploadf sample.pdf ~S1/folder1/folder2
-uploadf sample.txt ~S1/folder1/folder2
-uploadf sample.zip ~S1/folder1/folder2
+uploadf Scrap.c ~S1/folder1/folder2
+uploadf Proj_Desc.pdf ~S1/folder1/folder2
+uploadf Qwe.txt ~S1/folder1/folder2
+uploadf Asd.zip ~S1/folder1/folder2
 
-downlf ~S1/folder1/folder2/sample.c
-downlf ~S1/folder1/folder2/sample.pdf
-downlf ~S1/folder1/folder2/sample.txt
-downlf ~S1/folder1/folder2/sample.zip
+downlf ~S1/folder1/folder2/Scrap.c
+downlf ~S1/folder1/folder2/Proj_Desc.pdf
+downlf ~S1/folder1/folder2/Qwe.txt
+downlf ~S1/folder1/folder2/Asd.zip
 
 downltar .c
 downltar .pdf
@@ -15,9 +15,9 @@ downltar .zip
 
 dispfnames ~S1/folder1/folder2
 
-removef ~S1/folder1/folder2/sample.c
-removef ~S1/folder1/folder2/sample.pdf
-removef ~S1/folder1/folder2/sample.txt
-removef ~S1/folder1/folder2/sample.zip
+removef ~S1/folder1/folder2/Scrap.c
+removef ~S1/folder1/folder2/Proj_Desc.pdf
+removef ~S1/folder1/folder2/Qwe.txt
+removef ~S1/folder1/folder2/Asd.zip
 
 
